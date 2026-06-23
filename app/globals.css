@@ -1,0 +1,644 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   KÁMINI, A Night of Service
+   Dark, editorial, restrained. No gold. One warm-bone accent for active UI;
+   ember is reserved for fire/candle light material only, never UI.
+   ========================================================================= */
+
+:root {
+  color-scheme: dark;
+
+  /* Grounds */
+  --bg: #050505;
+  --bg-soft: #0d0d0c;
+  --surface: #141310;
+  --stone: #2a2925;
+
+  /* Text */
+  --text: #e9e1d4;
+  --text-soft: #c8beb0;
+  --muted: #8a8377;
+
+  /* Lines: low-opacity warm bone */
+  --line: rgba(233, 225, 212, 0.12);
+  --line-strong: rgba(233, 225, 212, 0.24);
+
+  /* Active UI accent: warm bone / ash-white, not gold */
+  --accent: #d6cec0;
+  --accent-soft: rgba(214, 206, 192, 0.24);
+
+  /* Ember: fire/candle media light only, never general UI decoration */
+  --ember: #8f3a24;
+
+  /* Type families (resolved from next/font CSS vars) */
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-body: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains), "SF Mono", ui-monospace, monospace;
+
+  /* Easing */
+  --ease-premium: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Durations */
+  --dur-ui: 320ms;
+  --dur-modal: 500ms;
+  --dur-reveal: 1100ms;
+
+  /* Layout */
+  /* Page gutter ramps with width: 20px phones, 40px tablet/laptop, 64px large.
+     Every movement + the header/footer share this var so they keep one left edge. */
+  --page-margin: 20px;
+  --header-h: 68px;
+
+  /* Z ladder */
+  --z-stage: 0;
+  --z-content: 10;
+  --z-header: 50;
+  --z-vignette: 80;
+  --z-grain: 90;
+  --z-skip: 100;
+
+  /* Service-dial plate diameter, shared with NightStage's centre plate. Three
+     terms: vh sizes it on common 16:9 / 16:10; vw is the column collision guard
+     (46vw keeps a ~26px gutter to the right course-detail column at the 1440
+     pinch, where page-margin jumps to 64px); 910px is an aesthetic cap. Drop the
+     vw term if any 1024-1440 measurement shows the plate edge crowding the text. */
+  --plate-d: min(86vh, 46vw, 910px);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --page-margin: 40px;
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --page-margin: 64px;
+  }
+}
+
+/* Small-desktop band (1024-1279): tighter room for the side columns, so the
+   plate scales down (36vw guard keeps ~47px to the column text at 1024, the
+   narrowest point). 1280+ takes the full-size plate above. */
+@media (max-width: 1279.98px) {
+  :root {
+    --plate-d: min(70vh, 36vw);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-surface: var(--surface);
+  --color-stone: var(--stone);
+  --color-text: var(--text);
+  --color-text-soft: var(--text-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-ember: var(--ember);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+
+  --ease-premium: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------------------------------------------------------------- base ---- */
+
+/* Default every border to the warm-bone hairline (Tailwind v4 defaults to
+   currentColor). Must live in @layer base: an unlayered `* { border-color }`
+   outranks Tailwind's @layer utilities and would silently override every
+   border-* utility. In base, utilities win as intended. */
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-h) + 12px);
+  -webkit-text-size-adjust: 100%;
+  /* Reserve the scrollbar gutter so locking overflow for a modal (the no-Lenis
+     fallback in use-dialog) never shifts the layout. */
+  scrollbar-gutter: stable;
+}
+
+/* Lenis owns the scroll when active, so kill native smooth or scrollTo
+   double-animates. The .lenis class is set by the Lenis instance. */
+html.lenis,
+html.lenis body {
+  scroll-behavior: auto;
+}
+html.lenis {
+  height: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern", "liga", "calt";
+  overflow-x: clip;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+
+.font-mono {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ----------------------------------------------------------- type scale ---- */
+/* Plain .t-* classes (not @theme --text-*) so the tailwind-merge custom
+   font-size drop bug can't fire (registered in cn() classGroups). Display is
+   mixed-case serif, never all-caps; only labels/eyebrows are uppercase mono. */
+
+.t-hero {
+  font-family: var(--font-display);
+  font-weight: 380;
+  /* Low clamp floor (3.25rem) so it never overflows narrow widths; the vw term
+     scales up to ~116px. opsz pinned to Fraunces' display ceiling (144) so the
+     large size renders true display letterforms, not body-optical shapes. */
+  font-size: clamp(3.25rem, 1rem + 7vw, 8.5rem);
+  line-height: 0.96;
+  letter-spacing: -0.018em;
+  font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 0;
+}
+
+/* Emphasised hero word: a single italic Fraunces word inside the upright H1.
+   Italic is a real loaded axis (lib/fonts.ts ships style:["normal","italic"]).
+   SOFT 40 / WONK 1 push the italic softer and wonkier for a hand-set feel. */
+.hero-em {
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "SOFT" 40, "WONK" 1;
+}
+
+/* Swash ampersand: wraps any "&" in a dish title/subtitle (see lib/typeset.tsx).
+   Italic is the guaranteed floor; dlig/swsh are the ceiling the Google subset
+   may strip. Inherits the serif so it renders as Fraunces' display ampersand. */
+.amp {
+  font-style: italic;
+  font-feature-settings: "dlig" 1, "swsh" 1;
+}
+
+.t-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 1.1rem + 4vw, 4rem);
+  line-height: 1.02;
+  letter-spacing: -0.012em;
+  font-variation-settings: "opsz" 96, "SOFT" 24;
+}
+
+.t-title {
+  font-family: var(--font-display);
+  font-weight: 440;
+  font-size: clamp(1.5rem, 1.1rem + 1.7vw, 2.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.006em;
+  font-variation-settings: "opsz" 48, "SOFT" 18;
+}
+
+/* Active course title in the dial details column, lifted above the shared
+   .t-title (footer brand + drawer list keep .t-title) so the live dish name
+   carries more weight beside the plate. Capped at ~40px: the column is only
+   clamp(15rem,20vw,18.5rem) ~240-296px wide, so larger would wrap longer names. */
+.t-course-title {
+  font-family: var(--font-display);
+  font-weight: 420;
+  font-size: clamp(1.9rem, 1.3rem + 1.4vw, 2.5rem);
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+  font-variation-settings: "opsz" 60, "SOFT" 18;
+}
+
+.t-lead {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.3rem);
+  line-height: 1.55;
+  letter-spacing: -0.003em;
+}
+
+.t-body {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.62;
+}
+
+/* Course ingredients: readable body, not mono all-caps. Data is stored
+   lowercase; ::first-letter lifts only the opening letter so the line reads as
+   a sentence, not a list of tags. */
+.t-spec {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+.t-spec::first-letter {
+  text-transform: uppercase;
+}
+/* Ingredient separators: faint middot between ingredients, quieter than the
+   ingredient text it divides. */
+.sep {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+/* Pairing / wine note: the finer, quieter sibling of .t-spec. Carries its own
+   lead in markup so it already starts capitalised. */
+.t-spec-fine {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  letter-spacing: 0.002em;
+}
+
+.t-label {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  line-height: 1.3;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.t-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.2;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+
+/* Hospitality overline: refined sans uppercase label for editorial eyebrows.
+   Mono (.t-label / .t-eyebrow) is reserved for true metadata only (progress
+   counter, legal + credit lines, dev captions) so the instrument texture reads
+   as an accent, not the default voice. Inter, not faux small-caps: the next/font
+   Google build doesn't ship a true smcp feature. */
+.t-overline {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Vertical spine label for the dial's left edge: the section eyebrow rotated to
+   read bottom-to-top against the viewport edge. Wider tracking than .t-overline
+   so it holds as an architectural rule, not a cramped caption. Sans (not the mono
+   t-eyebrow) — it's an editorial label, not an instrument readout. Rotation +
+   writing-mode are applied in the component, not here, so this stays pure type. */
+.t-spine {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.7rem;
+  line-height: 1;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+/* Header wordmark: airier than a mono t-label brand, in the hospitality sans
+   so the mark doesn't read as a code token. */
+.t-wordmark {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.95rem;
+  line-height: 1;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+/* Button label: refined sans caps, finer tracking, ~11px. */
+.t-button {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.69rem;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Locality kicker under the wordmark: tighter than an eyebrow so it reads as a
+   sub-label, not a wider line than the mark above it. */
+.t-kicker {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.62rem;
+  line-height: 1.2;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Dial marker label: dish title on the orbit ring. Sans (--font-body), not the
+   serif of the details/menu title — at ~12px it reads cleaner as a sans
+   micro-label. Kept small but legible, not tiny dots. */
+.t-marker-name {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(0.68rem, 0.64rem + 0.12vw, 0.78rem);
+  line-height: 1.25;
+  letter-spacing: 0.05em;
+}
+
+/* Active-course subtitle in the details column: serif italic, bone-soft.
+   (No gold; bone-soft holds the same role.) */
+.t-subtitle {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 380;
+  font-size: clamp(1.05rem, 0.85rem + 0.6vw, 1.4rem);
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  /* opsz tracks the ~17-22px rendered size; SOFT 18 matches t-title. Without it
+     the italic renders with the font's caption-optical letterforms. */
+  font-variation-settings: "opsz" 24, "SOFT" 18;
+}
+
+/* Same serif-italic subtitle role, capped small for the dense full-menu list
+   where the full t-subtitle clamp would rival the t-title dish name. Keeps the
+   treatment consistent across dial and menu. */
+.t-subtitle-sm {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 380;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  font-variation-settings: "opsz" 18, "SOFT" 18;
+}
+
+/* The dial's intro heading: display serif, sized to sit as two clean lines in
+   the narrow left column (smaller than the hero so it never crowds the markers). */
+.t-dial-lead {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.6rem, 1.1rem + 1.3vw, 2.1rem);
+  line-height: 1.05;
+  letter-spacing: -0.012em;
+  font-variation-settings: "opsz" 72, "SOFT" 24;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------ material ---- */
+
+/* Persistent film grain: fixed feTurbulence, spans every movement. */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-grain);
+  pointer-events: none;
+  opacity: 0.08;
+  /* screen, not soft-light: soft-light collapses to nothing as backdrop
+     luminance approaches 0, and ~90% of the page is near-black. screen adds the
+     grain's brightness independent of the base, so it reads on the dark grounds
+     without muddying brighter ember areas. */
+  mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Persistent vignette: fixed radial darkening at the edges. */
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-vignette);
+  pointer-events: none;
+  background: radial-gradient(
+    120% 90% at 50% 38%,
+    transparent 40%,
+    rgba(0, 0, 0, 0.45) 88%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+}
+
+@media print {
+  .grain::after,
+  .vignette {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------- reveals ---- */
+/* Static-first: content is visible by default. Motion only when the pre-paint
+   script proved full motion (html[data-motion="full"]), so nothing is ever
+   trapped at opacity:0 for reduced-motion or no-JS users. */
+
+html[data-motion="full"] [data-reveal] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity var(--dur-reveal) var(--ease-soft) var(--reveal-delay, 0s),
+    transform var(--dur-reveal) var(--ease-soft) var(--reveal-delay, 0s);
+  will-change: opacity, transform;
+}
+html[data-motion="full"] [data-reveal][data-shown] {
+  opacity: 1;
+  transform: none;
+}
+
+html[data-motion="full"] [data-reveal="mask"] {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 0 102% 0);
+  transition: clip-path var(--dur-reveal) var(--ease-premium)
+    var(--reveal-delay, 0s);
+}
+html[data-motion="full"] [data-reveal="mask"][data-shown] {
+  clip-path: inset(0 0 -8% 0);
+}
+
+/* -------------------------------------------------- dev-only media labels ---- */
+/* Placeholder [data-media] captions are hidden normally, revealed only when
+   html carries .dev-media-labels (dev opt-in). */
+.media-label {
+  display: none;
+}
+html.dev-media-labels .media-label {
+  display: block;
+}
+
+/* ------------------------------------------------------- scene scaffolding ---- */
+/* A movement's scroll track + sticky scene + stacked layers. Default (no-JS,
+   reduced-motion, < desktop) is normal flow, stacked and readable, nothing
+   overlapping or hidden. Full motion gives a tall track with a sticky scene
+   whose layers stack absolutely for GSAP to crossfade. */
+.scene-track {
+  position: relative;
+}
+html[data-motion="full"] .scene-track {
+  height: var(--track-h, 200vh);
+}
+
+.scene-pin {
+  position: relative;
+}
+html[data-motion="full"] .scene-pin {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+}
+
+/* --------------------------------------------------------- night stage ---- */
+/* The fixed media plane (NightStage) is scrubbed by GSAP only in full desktop
+   motion. When GSAP can't run (reduced-motion, reduced-data, sub-1024, no-JS)
+   the layers never morph, so they must resolve to one calm backdrop, not a stack
+   of composited frames: otherwise the terrace loop would sit lit over the hero
+   loop. The hero stays the single backdrop; plate and terrace are decorative +
+   aria-hidden, so collapsing them to rest state loses no content. These defaults
+   are also the exact full-motion arrival first-frame, so GSAP's gsap.set (in a
+   pre-paint layout effect) overrides them inline with zero flash; on matchMedia
+   revert the inline styles clear and these re-assert. Low specificity on purpose
+   so GSAP's inline styles always win. */
+.stage-plate {
+  clip-path: ellipse(0% 0% at 50% 50%);
+}
+.stage-room {
+  opacity: 0;
+}
+
+/* The #request settled-still bed. Under full desktop motion the fixed
+   TerraceSequence canvas paints the same final frame behind the transparent
+   section, so this static layer would only occlude it; hide it there. In the
+   default cohorts, where the canvas layer stays collapsed (stage-room:
+   opacity 0), it is the visible bed. */
+html[data-motion="full"] .request-still {
+  opacity: 0;
+}
+
+/* ------------------------------------------------------------- dialogs ---- */
+/* Native <dialog> (focus trap + Escape + focus-restore for free). Animated with
+   @starting-style + allow-discrete so they fade/slide without JS. */
+.modal {
+  border: none;
+  opacity: 0;
+  transition:
+    opacity var(--dur-modal) var(--ease-soft),
+    transform var(--dur-modal) var(--ease-premium),
+    overlay var(--dur-modal) var(--ease-premium) allow-discrete,
+    display var(--dur-modal) var(--ease-premium) allow-discrete;
+}
+.modal[open] {
+  opacity: 1;
+}
+@starting-style {
+  .modal[open] {
+    opacity: 0;
+  }
+}
+.modal::backdrop {
+  background: rgba(5, 5, 5, 0);
+  transition:
+    background var(--dur-ui) var(--ease-soft),
+    overlay var(--dur-ui) var(--ease-soft) allow-discrete,
+    display var(--dur-ui) var(--ease-soft) allow-discrete;
+}
+.modal[open]::backdrop {
+  background: rgba(5, 5, 5, 0.74);
+}
+/* The "Tonight's Menu" card slides from the right. */
+.modal-right {
+  transform: translateX(28px);
+}
+.modal-right[open] {
+  transform: translateX(0);
+}
+@starting-style {
+  .modal-right[open] {
+    transform: translateX(28px);
+  }
+}
+
+/* The reservation card: a centred dialog (UA margin:auto centres it; no
+   m-0/ml-auto here). Rises + settles a few px on open, same easing as the
+   drawer; reduced-motion snaps it via the global transition-kill, so nothing
+   is ever trapped mid-transform. */
+.modal-center {
+  transform: translateY(12px) scale(0.985);
+}
+.modal-center[open] {
+  transform: translateY(0) scale(1);
+}
+@starting-style {
+  .modal-center[open] {
+    transform: translateY(12px) scale(0.985);
+  }
+}
+
+/* --------------------------------------------------------- service dial ---- */
+/* Layout gate. The radial orbit clock (DialRadial) renders only where the pinned
+   scroll choreography is live (desktop width and full motion), because its
+   markers orbit the NightStage plate, which opens only under GSAP. Every other
+   surface (sub-lg, reduced motion, reduced data, no-JS) gets the stacked column
+   (DialStacked); there the plate stays clipped shut, so an orbit would circle a
+   void. html[data-motion] is set pre-paint by MotionScript, so this resolves
+   before first paint: no flash, no CLS, no hydration swap. Unlayered on purpose
+   so it owns display deterministically; the elements carry no Tailwind display
+   utility of their own. */
+.dial-radial {
+  display: none;
+}
+.dial-stacked {
+  display: block;
+}
+@media (min-width: 1024px) {
+  html[data-motion="full"] .dial-radial {
+    display: flex;
+  }
+  html[data-motion="full"] .dial-stacked {
+    display: none;
+  }
+}
+
+/* ----------------------------------------------------- reduced motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
