@@ -1,0 +1,123 @@
+# Design gate: headless Claude runs Lighthouse + axe against the production build
+# and fails the job below budgets (perf >= 95, a11y = 100, axe violations = 0).
+#
+# Created 2026-07-11 (OS improvement pass, Phase 7 — durable scheduled automation).
+# Pattern per https://code.claude.com/docs/en/github-actions (claude-code-action@v1,
+# automation mode: cron/workflow_dispatch trigger + prompt input + claude_args).
+#
+# MANUAL ACTION required before first run:
+#   gh secret set ANTHROPIC_API_KEY --repo periklispalmos/kamini
+#   (or GitHub web UI: Settings -> Secrets and variables -> Actions -> New repository secret)
+
+name: Design Gate
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC — weekly drift check
+
+permissions:
+  contents: read
+
+concurrency:
+  group: design-gate
+  cancel-in-progress: true
+
+jobs:
+  design-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Start app
+        run: |
+          pnpm start &
+          echo "waiting for http://localhost:3000 ..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null; then
+              echo "app is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "app failed to start within 60s"
+          exit 1
+
+      - name: Claude audit (Lighthouse + axe)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            The production build of this repo is already running at http://localhost:3000.
+            Run a design-quality audit and write a verdict file. Steps:
+
+            1. Lighthouse (desktop preset, headless):
+               npx --yes lighthouse http://localhost:3000 --preset=desktop --output=json --output-path=./lighthouse-report.json --chrome-flags="--headless --no-sandbox" --quiet
+               Read categories.performance.score and categories.accessibility.score from
+               the JSON (0-1 floats; multiply by 100 and round to integers).
+
+            2. axe accessibility scan:
+               npx --yes @axe-core/cli http://localhost:3000
+               A non-zero exit here means violations were found — that is data, not a
+               tooling error. Count the total violations from the output (0 if clean).
+
+            3. BUDGETS: performance >= 95, accessibility == 100, axe violations == 0.
+
+            4. Write ./design-gate-verdict.json (repo root) with exactly this shape:
+               {"performance": <int>, "accessibility": <int>, "axeViolations": <int>,
+                "pass": <true only if ALL budgets hold>,
+                "notes": "<one line per failed budget with number vs budget; empty string if pass>"}
+
+            Do not modify any other file. Do not commit or push anything.
+          claude_args: |
+            --max-turns 25
+            --allowedTools "Bash,Read,Write,Glob,Grep"
+
+      - name: Enforce budgets
+        run: |
+          if [ ! -f design-gate-verdict.json ]; then
+            echo "::error::design-gate-verdict.json missing — Claude audit did not complete"
+            exit 1
+          fi
+          cat design-gate-verdict.json
+          node -e '
+            const v = require("./design-gate-verdict.json");
+            const fail = [];
+            if (typeof v.performance !== "number" || v.performance < 95) fail.push(`performance ${v.performance} < 95`);
+            if (v.accessibility !== 100) fail.push(`accessibility ${v.accessibility} != 100`);
+            if (v.axeViolations !== 0) fail.push(`axe violations ${v.axeViolations} != 0`);
+            if (!v.pass || fail.length) {
+              console.error("Design gate FAILED:", fail.join("; ") || v.notes);
+              process.exit(1);
+            }
+            console.log("Design gate PASSED:", JSON.stringify(v));
+          '
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-gate-reports
+          path: |
+            design-gate-verdict.json
+            lighthouse-report.json
+          if-no-files-found: ignore
